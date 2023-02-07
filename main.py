@@ -3,45 +3,41 @@
 # To simplify the code, we assume infinite memory
 # I also endow each seller with one unit; and give each buyer unit demand
 
-# To do: CHECK A FULL SIMULATION!
-
 import numpy as np
 from scipy.interpolate import CubicSpline
 from random import choices
 
 # PARAMETERS
 
-# Define the set of buyers and their valuations
+# Set the number of buyers (which equals the number of sellers)
 
-buyers = list(range(0, 4))
+n = 5
 
-values = [225, 260, 280, 305]
+# Set the buyer valuations and seller costs
 
-# Define the set of sellers and their costs
+input_values = [100, 200, 300, 400, 500]
 
-sellers = list(range(4, 8))
-
-costs = [140, 165, 190, 230]
+input_costs = [195, 245, 295, 345, 395]
 
 # Set the value of the 'very high' ask (resp, bid) which will never (resp, always) be accepted
 
 m = 1000
 
-# Set the length l of every round
+# Set the maximum length l of every round
 
-l = 40
+l = 150
 
 # Set the number of rounds
 
-r = 5
+r = 2
 
 # HISTORIES
 
-# We now define some lists which keep track of historic market activity
+# We now define some lists which keep track of historic market activity across all rounds
 
-bids = [0]
+bids = []
 
-asks = [m]
+asks = []
 
 accepted_bids = []
 
@@ -52,20 +48,6 @@ accepted_asks = []
 rejected_asks = []
 
 union = asks + bids
-
-prices = []
-
-trades = 0
-
-market_bid = 0
-
-market_ask = m
-
-active_bidder = 100
-
-active_seller = 100
-
-spread = list(range(market_bid, market_ask+1))
 
 # SELLER BELIEFS
 
@@ -133,7 +115,7 @@ def p(a):
 def tbl(b):
     return len([bid for bid in accepted_bids if bid <= b])
 
-# Count the bids that are less than or equal to b
+# Count the asks that are less than or equal to b
 
 def al(b):
     return len([ask for ask in asks if ask <= b])
@@ -153,7 +135,7 @@ def q_hat(b):
     else:
         return (tbl(b) + al(b))/(tbl(b) + al(b) + rbg(b))
 
-# Extend these beliefs over the reals as before
+# Extend these beliefs over the reals as before, again taking account of the spread reduction rule
 
 def q(b):
     # Bids below the market bid cannot be accepted
@@ -193,15 +175,18 @@ def s_payoff(c, a):
 # Observe that this function returns the optimal ask as the first entry, and the associated payoff as the second
 
 def optimal_ask(c):
-    # If the seller were called to play, then the last ask was rejected
-    rejected_asks.append(market_ask)
-    # Now find the optimal ask
+    # If the seller were called on to play, then the last ask must have been rejected
+    if market_ask != m:
+        rejected_asks.append(market_ask)
+    # Now calculate the expected payoff from every possible ask
     payoffs = [s_payoff(c, a) for a in spread]
-    # The seller hasn't actually been called to play yet, so undo the damage
-    rejected_asks.remove(market_ask)
+    max_payoff = max(payoffs)
+    # The seller hasn't actually been called to play yet, so undo the 'damage'
+    if market_ask != m:
+        rejected_asks.remove(market_ask)
     # Return the results
-    if max(payoffs) > 0:
-        return [payoffs.index(max(payoffs)) + min(spread), max(payoffs)]
+    if max_payoff > 0:
+        return [payoffs.index(max_payoff) + min(spread), max_payoff]
     else:
         return [m, 0.0]
 
@@ -215,14 +200,17 @@ def b_payoff(v, b):
 
 def optimal_bid(v):
     # If the buyer were called to play, then the last bid was rejected
-    rejected_bids.append(market_bid)
+    if market_bid != 0:
+        rejected_bids.append(market_bid)
     # Now find the optimal bid
     payoffs = [b_payoff(v, b) for b in spread]
+    max_payoff = max(payoffs)
     # The buyer hasn't actually been called to play yet, so 'undo' the damage
-    rejected_bids.remove(market_bid)
+    if market_bid != 0:
+        rejected_bids.remove(market_bid)
     # Return the results
-    if max(payoffs) > 0:
-        return [payoffs.index(max(payoffs)) + min(spread), max(payoffs)]
+    if max_payoff > 0:
+        return [payoffs.index(max_payoff) + min(spread), max_payoff]
     else:
         return [0, 0.0]
 
@@ -237,116 +225,170 @@ def p_move():
     seller_payoffs = [optimal_ask(c)[1] for c in costs]
     all_payoffs = buyer_payoffs + seller_payoffs
     normalisation = sum(all_payoffs)
-    return [i/normalisation for i in all_payoffs]
+    if normalisation > 0:
+        return [i/normalisation for i in all_payoffs]
 
 # This function chooses a player to move
 
 def choose_player():
-    players = buyers + sellers
-    weights = p_move()
-    return choices(players, weights)[0]
+    probabilities = p_move()
+    if probabilities is not None:
+        players = buyers + sellers
+        weights = probabilities
+        return choices(players, weights)[0]
 
 # SIMULATIONS
 
-for time in range(l):
-    # First, choose a player
-    player = choose_player()
-    print(f'Player: {player}')
-    # Suppose first they are a buyer
-    if player in buyers:
-        # The last bid was rejected
-        rejected_bids.append(market_bid)
-        print(f'Rejected bids: {rejected_bids}')
-        print('[Buyer]')
-        index = buyers.index(player)
-        valuation = values[index]
-        print(f'Valuation {valuation}')
-        bid = optimal_bid(valuation)[0]
-        # They might choose to accept the market ask, leading to transaction
-        if bid == market_ask:
-            trades += 1
-            print(f'Trades {trades}')
-            prices.append(bid)
-            print(f'Trades {prices}')
-            accepted_asks.append(bid)
-            print(f'Accepted asks {accepted_asks}')
-            # Following the transaction, we need to reset the bid/ask spread
-            market_bid = 0
-            print(f'Market bid {market_bid}')
-            market_ask = m
-            print(f'Market ask {market_ask}')
-            # We also remove the buyer/seller (and their value/cost) from the market
-            buyers.remove(player)
-            print(f'Buyers {buyers}')
-            values.remove(valuation)
-            print(f'Values {values}')
-            print(f'Active seller {active_seller}')
-            index = sellers.index(active_seller)
-            cost = costs[index]
-            costs.remove(cost)
-            print(f'Costs {costs}')
-            sellers.remove(active_seller)
-        # Alternatively, they might just be making a (positive) bid
-        elif market_ask > bid > 0:
-            active_bidder = player
-            print(f'Active bidder {active_bidder}')
-            bids.append(bid)
-            print(f'Bids {bids}')
-            rejected_asks.append(market_ask)
-            print(f'Rejected asks {rejected_asks}')
-            market_bid = bid
-            print(f'Market bid: {market_bid}')
-    # Instead, the player might be a seller
-    elif player in sellers:
-        # The last ask was rejected
-        rejected_asks.append(market_ask)
-        print(f'Rejected asks: {rejected_asks}')
-        print('[Seller]')
-        index = sellers.index(player)
-        valuation = costs[index]
-        print(f'Valuation: {valuation}')
-        ask = optimal_ask(valuation)[0]
-        print(f'Ask: {ask}')
-        # They might choose to accept the market bid, leading to a transaction
-        if ask == market_bid:
-            trades += 1
-            print(f'Trades {trades}')
-            prices.append(ask)
-            print(f' Prices {prices}')
-            accepted_bids.append(ask)
-            print(f' Accepted bids {accepted_bids}')
-            # Following the transaction, we need to reset the bid/ask spread
-            market_bid = 0
-            print(f' Market bid {market_bid}')
-            market_ask = m
-            print(f' Market ask {market_ask}')
-            # We also remove the seller/buyer (and their cost/value) from the market
-            sellers.remove(player)
-            print(f' Sellers {sellers}')
-            costs.remove(valuation)
-            print(f' Costs {costs}')
-            index = buyers.index(active_bidder)
-            valuation = values[index]
-            values.remove(valuation)
-            print(f' Values {values}')
-            buyers.remove(active_bidder)
-            print(f' Buyers {buyers}')
-        # They might instead be just making an ask (less than m)
-        elif market_bid < ask < m:
-            active_seller = player
-            print(f'Active seller {active_seller}')
-            asks.append(ask)
-            print(f'Asks: {asks}')
-            rejected_bids.append(market_bid)
-            print(rejected_bids)
-            print(f'Rejected bids: {rejected_bids}')
-            market_ask = ask
-            print(f'Market ask: {market_ask}')
-    # In either case, we should update the spread and union lists:
-    spread = list(range(market_bid, market_ask+1))
-    union = list(dict.fromkeys(asks + bids + [0, m]))
-    print(f'union: {union}')
-    print('------')
+# Define some lists that will be used to collect the results
 
-print(f'Trades: {trades}')
-print(f'Prices: {prices}')
+all_prices = []
+number_of_trades = []
+all_buyer_values = []
+all_seller_costs = []
+
+# Now start the simulation
+
+for element in range(r):
+    # At the start of a round, refresh the buyer/seller valuations
+    buyers = list(range(0, n))
+    sellers = list(range(n, 2*n))
+    values = [element for element in input_values]
+    costs = [element for element in input_costs]
+    # Reset the spread
+    market_bid = 0
+    market_ask = m
+    spread = list(range(market_bid, market_ask + 1))
+    active_bidder = 100
+    active_seller = 100
+    # Reset the lists used for data collection
+    prices = []
+    buyer_values = []
+    seller_costs = []
+    trades = 0
+    # The round now begins
+    iteration = 0
+    for time in range(l):
+        iteration += 1
+        print(f'Move: {iteration}')
+        # First, choose a player
+        player = choose_player()
+        if player is None:
+            print("End of round")
+            break
+        print(f'Player: {player}')
+        # Suppose first they are a buyer
+        if player in buyers:
+            print('[Buyer]')
+            # The last bid must have been rejected
+            if market_bid != 0:
+                rejected_bids.append(market_bid)
+            print(f'Rejected bids: {rejected_bids}')
+            index = buyers.index(player)
+            valuation = values[index]
+            print(f'Valuation {valuation}')
+            bid = optimal_bid(valuation)[0]
+            # They might choose to accept the market ask, leading to transaction
+            if bid == market_ask:
+                trades += 1
+                print(f'Trades {trades}')
+                prices.append(bid)
+                print(f'Trades {prices}')
+                buyer_values.append(valuation)
+                accepted_asks.append(bid)
+                print(f'Accepted asks {accepted_asks}')
+                # Following the transaction, we need to reset the bid/ask spread
+                market_bid = 0
+                print(f'Market bid {market_bid}')
+                market_ask = m
+                print(f'Market ask {market_ask}')
+                # We also remove the buyer/seller (and their value/cost) from the market
+                buyers.remove(player)
+                print(f'Buyers {buyers}')
+                values.remove(valuation)
+                print(f'Values {values}')
+                print(f'Active seller {active_seller}')
+                index = sellers.index(active_seller)
+                cost = costs[index]
+                seller_costs.append(cost)
+                costs.remove(cost)
+                print(f'Costs {costs}')
+                sellers.remove(active_seller)
+                print(f'Sellers {sellers}')
+            # Alternatively, they might just be making a (positive) bid
+            elif market_ask > bid > 0:
+                active_bidder = player
+                print(f'Active bidder {active_bidder}')
+                bids.append(bid)
+                print(f'Bids {bids}')
+                if market_ask != m:
+                    rejected_asks.append(market_ask)
+                print(f'Rejected asks {rejected_asks}')
+                market_bid = bid
+                print(f'Market bid: {market_bid}')
+        # Instead, the player might be a seller
+        elif player in sellers:
+            print('[Seller]')
+            # The last ask was rejected
+            if market_ask != m:
+                rejected_asks.append(market_ask)
+            print(f'Rejected asks: {rejected_asks}')
+            index = sellers.index(player)
+            valuation = costs[index]
+            print(f'Valuation: {valuation}')
+            ask = optimal_ask(valuation)[0]
+            print(f'Ask: {ask}')
+            # They might choose to accept the market bid, leading to a transaction
+            if ask == market_bid:
+                trades += 1
+                print(f'Trades {trades}')
+                prices.append(ask)
+                print(f' Prices {prices}')
+                accepted_bids.append(ask)
+                print(f' Accepted bids {accepted_bids}')
+                seller_costs.append(valuation)
+                # Following the transaction, we need to reset the bid/ask spread
+                market_bid = 0
+                print(f' Market bid {market_bid}')
+                market_ask = m
+                print(f' Market ask {market_ask}')
+                # We also remove the seller/buyer (and their cost/value) from the market
+                sellers.remove(player)
+                print(f' Sellers {sellers}')
+                costs.remove(valuation)
+                print(f' Costs {costs}')
+                index = buyers.index(active_bidder)
+                valuation = values[index]
+                buyer_values.append(valuation)
+                values.remove(valuation)
+                print(f' Values {values}')
+                buyers.remove(active_bidder)
+                print(f' Buyers {buyers}')
+            # They might instead be just making an ask (less than m)
+            elif market_bid < ask < m:
+                active_seller = player
+                print(f'Active seller {active_seller}')
+                asks.append(ask)
+                print(f'Asks: {asks}')
+                if market_bid != 0:
+                    rejected_bids.append(market_bid)
+                print(rejected_bids)
+                print(f'Rejected bids: {rejected_bids}')
+                market_ask = ask
+                print(f'Market ask: {market_ask}')
+        # In either case, we should update the spread and union lists:
+        spread = list(range(market_bid, market_ask+1))
+        union = list(dict.fromkeys(asks + bids + [0, m]))
+        print(f'union: {union}')
+        print('------')
+    # Save the data from this round
+    all_prices.append(prices)
+    number_of_trades.append(trades)
+    all_buyer_values.append(buyer_values)
+    all_seller_costs.append(seller_costs)
+
+# Finally, print the results
+print('RESULTS')
+print(f'Prices: {all_prices}')
+print(f'Trades: {number_of_trades}')
+print(f'Buyer values: {all_buyer_values}')
+print(f'Seller costs: {all_seller_costs}')
