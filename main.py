@@ -9,17 +9,13 @@ from random import choices
 
 # PARAMETERS
 
-# Set the number of buyers (which equals the number of sellers)
-
-n = 5
-
 # Set the buyer valuations and seller costs
 
 input_values = [100, 200, 300, 400, 500]
 
 input_costs = [195, 245, 295, 345, 395]
 
-# Set the value of the 'very high' ask (resp, bid) which will never (resp, always) be accepted
+# Set the value of the 'very high' ask (resp., bid) which will never (resp., always) be accepted
 
 m = 1000
 
@@ -31,40 +27,65 @@ l = 150
 
 r = 2
 
+# Set the number of transactions that are remembered
+
+memory = 3
+
 # HISTORIES
 
+# As a preliminary, calculate the number of buyers/sellers
+
+n = len(input_values)
+
 # We now define some lists which keep track of historic market activity across all rounds
+# Note that data associated with a different transactions are separated into different sub-lists
 
-bids = []
+bids = [[]]
 
-asks = []
+asks = [[]]
 
-accepted_bids = []
+accepted_bids = [[]]
 
-rejected_bids = []
+rejected_bids = [[]]
 
-accepted_asks = []
+accepted_asks = [[]]
 
-rejected_asks = []
+rejected_asks = [[]]
 
-union = asks + bids
+# Do we need this?
+union = []
 
 # SELLER BELIEFS
+
+# As a preliminary, define a function which extracts the remembered elements from a list
+
+def mem(a_list):
+    flattened_list = []
+    if len(a_list) < memory:
+        for sub_list in a_list:
+            for item in sub_list:
+                flattened_list.append(item)
+    else:
+        for sub_list in a_list[-memory:]:
+            for item in sub_list:
+                flattened_list.append(item)
+    return flattened_list
+
 
 # Count the number of taken (i.e. accepted) asks that are greater than or equal to a
 
 def tag(a):
-    return len([ask for ask in accepted_asks if ask >= a])
+    return len([ask for ask in mem(accepted_asks) if ask >= a])
 
 # Count the number of bids that are greater than or equal to a
 
 def bg(a):
-    return len([bid for bid in bids if bid >= a])
+    return len([bid for bid in mem(bids) if bid >= a])
 
 # Count the total number of rejected asks that are less than or equal to a
 
 def ral(a):
-    return len([ask for ask in rejected_asks if ask <= a])
+    return len([ask for ask in mem(rejected_asks) if ask <= a])
 
 # Define the seller beliefs (defined ONLY over the set of bids and asks in the history, plus 0 and m).
 
@@ -113,17 +134,17 @@ def p(a):
 # Count the taken (i.e. accepted) bids that are less than or equal to b
 
 def tbl(b):
-    return len([bid for bid in accepted_bids if bid <= b])
+    return len([bid for bid in mem(accepted_bids) if bid <= b])
 
 # Count the asks that are less than or equal to b
 
 def al(b):
-    return len([ask for ask in asks if ask <= b])
+    return len([ask for ask in mem(asks) if ask <= b])
 
 # Count the rejected bids that are greater than or equal to b
 
 def rbg(b):
-    return len([bid for bid in rejected_bids if bid >= b])
+    return len([bid for bid in mem(rejected_bids) if bid >= b])
 
 # Define the buyer beliefs (defined ONLY over the set of bids and asks in the history, plus 0 and m).
 
@@ -177,13 +198,13 @@ def s_payoff(c, a):
 def optimal_ask(c):
     # If the seller were called on to play, then the last ask must have been rejected
     if market_ask != m:
-        rejected_asks.append(market_ask)
+        rejected_asks[t].append(market_ask)
     # Now calculate the expected payoff from every possible ask
     payoffs = [s_payoff(c, a) for a in spread]
     max_payoff = max(payoffs)
     # The seller hasn't actually been called to play yet, so undo the 'damage'
     if market_ask != m:
-        rejected_asks.remove(market_ask)
+        rejected_asks[t].remove(market_ask)
     # Return the results
     if max_payoff > 0:
         return [payoffs.index(max_payoff) + min(spread), max_payoff]
@@ -201,13 +222,13 @@ def b_payoff(v, b):
 def optimal_bid(v):
     # If the buyer were called to play, then the last bid was rejected
     if market_bid != 0:
-        rejected_bids.append(market_bid)
+        rejected_bids[t].append(market_bid)
     # Now find the optimal bid
     payoffs = [b_payoff(v, b) for b in spread]
     max_payoff = max(payoffs)
     # The buyer hasn't actually been called to play yet, so 'undo' the damage
     if market_bid != 0:
-        rejected_bids.remove(market_bid)
+        rejected_bids[t].remove(market_bid)
     # Return the results
     if max_payoff > 0:
         return [payoffs.index(max_payoff) + min(spread), max_payoff]
@@ -246,6 +267,10 @@ number_of_trades = []
 all_buyer_values = []
 all_seller_costs = []
 
+# Define a variable that counts the number of transactions
+
+t = 0
+
 # Now start the simulation
 
 for element in range(r):
@@ -281,7 +306,7 @@ for element in range(r):
             print('[Buyer]')
             # The last bid must have been rejected
             if market_bid != 0:
-                rejected_bids.append(market_bid)
+                rejected_bids[t].append(market_bid)
             print(f'Rejected bids: {rejected_bids}')
             index = buyers.index(player)
             valuation = values[index]
@@ -294,7 +319,7 @@ for element in range(r):
                 prices.append(bid)
                 print(f'Trades {prices}')
                 buyer_values.append(valuation)
-                accepted_asks.append(bid)
+                accepted_asks[t].append(bid)
                 print(f'Accepted asks {accepted_asks}')
                 # Following the transaction, we need to reset the bid/ask spread
                 market_bid = 0
@@ -314,14 +339,18 @@ for element in range(r):
                 print(f'Costs {costs}')
                 sellers.remove(active_seller)
                 print(f'Sellers {sellers}')
+                # Finally, increment the transactions counter
+                t += 1
+                for x in [bids, asks, accepted_bids, rejected_bids, accepted_asks, rejected_asks]:
+                    x.append([])
             # Alternatively, they might just be making a (positive) bid
             elif market_ask > bid > 0:
                 active_bidder = player
                 print(f'Active bidder {active_bidder}')
-                bids.append(bid)
+                bids[t].append(bid)
                 print(f'Bids {bids}')
                 if market_ask != m:
-                    rejected_asks.append(market_ask)
+                    rejected_asks[t].append(market_ask)
                 print(f'Rejected asks {rejected_asks}')
                 market_bid = bid
                 print(f'Market bid: {market_bid}')
@@ -330,11 +359,11 @@ for element in range(r):
             print('[Seller]')
             # The last ask was rejected
             if market_ask != m:
-                rejected_asks.append(market_ask)
+                rejected_asks[t].append(market_ask)
             print(f'Rejected asks: {rejected_asks}')
             index = sellers.index(player)
             valuation = costs[index]
-            print(f'Valuation: {valuation}')
+            print(f'Cost: {valuation}')
             ask = optimal_ask(valuation)[0]
             print(f'Ask: {ask}')
             # They might choose to accept the market bid, leading to a transaction
@@ -343,7 +372,7 @@ for element in range(r):
                 print(f'Trades {trades}')
                 prices.append(ask)
                 print(f' Prices {prices}')
-                accepted_bids.append(ask)
+                accepted_bids[t].append(ask)
                 print(f' Accepted bids {accepted_bids}')
                 seller_costs.append(valuation)
                 # Following the transaction, we need to reset the bid/ask spread
@@ -363,21 +392,24 @@ for element in range(r):
                 print(f' Values {values}')
                 buyers.remove(active_bidder)
                 print(f' Buyers {buyers}')
+                # Finally, increment the transactions counter
+                t += 1
+                for x in [bids, asks, accepted_bids, rejected_bids, accepted_asks, rejected_asks]:
+                    x.append([])
             # They might instead be just making an ask (less than m)
             elif market_bid < ask < m:
                 active_seller = player
                 print(f'Active seller {active_seller}')
-                asks.append(ask)
+                asks[t].append(ask)
                 print(f'Asks: {asks}')
                 if market_bid != 0:
-                    rejected_bids.append(market_bid)
-                print(rejected_bids)
+                    rejected_bids[t].append(market_bid)
                 print(f'Rejected bids: {rejected_bids}')
                 market_ask = ask
                 print(f'Market ask: {market_ask}')
         # In either case, we should update the spread and union lists:
         spread = list(range(market_bid, market_ask+1))
-        union = list(dict.fromkeys(asks + bids + [0, m]))
+        union = list(dict.fromkeys(mem(asks) + mem(bids) + [0, m]))
         print(f'union: {union}')
         print('------')
     # Save the data from this round
