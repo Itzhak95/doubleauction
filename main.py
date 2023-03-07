@@ -5,10 +5,6 @@
 import numpy as np
 from scipy.interpolate import CubicSpline
 from random import choices, randint
-import random
-
-np.random.seed(7)
-random.seed(7)
 
 # PARAMETERS
 
