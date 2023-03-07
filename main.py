@@ -4,7 +4,11 @@
 
 import numpy as np
 from scipy.interpolate import CubicSpline
-from random import choices
+from random import choices, randint
+import random
+
+np.random.seed(7)
+random.seed(7)
 
 # PARAMETERS
 
@@ -64,7 +68,7 @@ union = []
 
 def mem(a_list):
     flattened_list = []
-    if len(a_list) < memory:
+    if len(a_list) <= memory:
         for sub_list in a_list:
             for item in sub_list:
                 flattened_list.append(item)
@@ -73,7 +77,6 @@ def mem(a_list):
             for item in sub_list:
                 flattened_list.append(item)
     return flattened_list
-
 
 # Count the number of taken (i.e. accepted) asks that are greater than or equal to a
 
@@ -98,6 +101,16 @@ def p_hat(a):
     elif a >= m:
         return 0.0
     else:
+        if tag(a) + bg(a) + ral(a) == 0:
+            print("ERROR P!")
+            print(a)
+            print(tag(a))
+            print(bg(a))
+            print(ral(a))
+            print(union)
+            print(accepted_asks)
+            print(bids)
+            print(rejected_asks)
         return (tag(a) + bg(a)) / (tag(a) + bg(a) + ral(a))
 
 # Now extend these beliefs over the reals, while also taking care of asks outside of the bid/ask spread
@@ -157,6 +170,16 @@ def q_hat(b):
     elif b >= m:
         return 1.0
     else:
+        if tbl(b) + al(b) + rbg(b) == 0:
+            print('ERROR Q!')
+            print(b)
+            print(tbl(b))
+            print(al(b))
+            print(rbg(b))
+            print(union)
+            print(accepted_bids)
+            print(asks)
+            print(rejected_bids)
         return (tbl(b) + al(b))/(tbl(b) + al(b) + rbg(b))
 
 # Extend these beliefs over the reals as before, again taking account of the spread reduction rule
@@ -301,6 +324,10 @@ for element in range(r):
         # First, choose a player
         player = choose_player()
         if player is None:
+            if market_bid != 0:
+                rejected_bids[t].append(market_bid)
+            if market_ask != m:
+                rejected_asks[t].append(market_ask)
             print("End of round")
             break
         print(f'Player: {player}')
@@ -333,6 +360,13 @@ for element in range(r):
                 if replacement != 1:
                     buyers.remove(player)
                     values.remove(valuation)
+                # In the case of random replacement...
+                if replacement == 2:
+                    new_buyer = randint(0, n-1)
+                    buyers.append(new_buyer)
+                    print(f'New buyer: {new_buyer}')
+                    values.append(input_values[new_buyer])
+                    print(f'New value: {input_values[new_buyer]}')
                 print(f'Buyers {buyers}')
                 print(f'Values {values}')
                 print(f'Active seller {active_seller}')
@@ -344,6 +378,13 @@ for element in range(r):
                     sellers.remove(active_seller)
                 print(f'Costs {costs}')
                 print(f'Sellers {sellers}')
+                # In the case of random replacement...
+                if replacement == 2:
+                    new_seller = randint(n, 2*n-1)
+                    sellers.append(new_seller)
+                    print(f'New seller: {new_seller}')
+                    costs.append(input_costs[new_seller-n])
+                    print(f'New value: {input_costs[new_seller-n]}')
                 # Finally, increment the transactions counter
                 t += 1
                 for x in [bids, asks, accepted_bids, rejected_bids, accepted_asks, rejected_asks]:
@@ -389,6 +430,13 @@ for element in range(r):
                 if replacement != 1:
                     sellers.remove(player)
                     costs.remove(valuation)
+                # In the case of random replacement...
+                if replacement == 2:
+                    new_seller = randint(n, 2 * n - 1)
+                    sellers.append(new_seller)
+                    print(f'New seller: {new_seller}')
+                    costs.append(input_costs[new_seller - n])
+                    print(f'New value: {input_costs[new_seller - n]}')
                 print(f' Sellers {sellers}')
                 print(f' Costs {costs}')
                 index = buyers.index(active_bidder)
@@ -399,6 +447,13 @@ for element in range(r):
                     buyers.remove(active_bidder)
                 print(f' Values {values}')
                 print(f' Buyers {buyers}')
+                # In the case of random replacement...
+                if replacement == 2:
+                    new_buyer = randint(0, n-1)
+                    buyers.append(new_buyer)
+                    print(f'New buyer: {new_buyer}')
+                    values.append(input_values[new_buyer])
+                    print(f'New value: {input_values[new_buyer]}')
                 # Finally, increment the transactions counter
                 t += 1
                 for x in [bids, asks, accepted_bids, rejected_bids, accepted_asks, rejected_asks]:
