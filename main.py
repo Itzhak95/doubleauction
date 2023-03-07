@@ -1,5 +1,4 @@
 # This program implements Gjerstad and Dickhaut's (1998) model of the double auction
-
 # To simplify the code, we assume infinite memory
 # I also endow each seller with one unit; and give each buyer unit demand
 
@@ -30,6 +29,10 @@ r = 2
 # Set the number of transactions that are remembered
 
 memory = 3
+
+# Set the replacement rule (0 = no replacement, 1 = perfect replacement, 2 = random replacement)
+
+replacement = 0
 
 # HISTORIES
 
@@ -327,17 +330,19 @@ for element in range(r):
                 market_ask = m
                 print(f'Market ask {market_ask}')
                 # We also remove the buyer/seller (and their value/cost) from the market
-                buyers.remove(player)
+                if replacement != 1:
+                    buyers.remove(player)
+                    values.remove(valuation)
                 print(f'Buyers {buyers}')
-                values.remove(valuation)
                 print(f'Values {values}')
                 print(f'Active seller {active_seller}')
                 index = sellers.index(active_seller)
                 cost = costs[index]
                 seller_costs.append(cost)
-                costs.remove(cost)
+                if replacement != 1:
+                    costs.remove(cost)
+                    sellers.remove(active_seller)
                 print(f'Costs {costs}')
-                sellers.remove(active_seller)
                 print(f'Sellers {sellers}')
                 # Finally, increment the transactions counter
                 t += 1
@@ -381,16 +386,18 @@ for element in range(r):
                 market_ask = m
                 print(f' Market ask {market_ask}')
                 # We also remove the seller/buyer (and their cost/value) from the market
-                sellers.remove(player)
+                if replacement != 1:
+                    sellers.remove(player)
+                    costs.remove(valuation)
                 print(f' Sellers {sellers}')
-                costs.remove(valuation)
                 print(f' Costs {costs}')
                 index = buyers.index(active_bidder)
                 valuation = values[index]
                 buyer_values.append(valuation)
-                values.remove(valuation)
+                if replacement != 1:
+                    values.remove(valuation)
+                    buyers.remove(active_bidder)
                 print(f' Values {values}')
-                buyers.remove(active_bidder)
                 print(f' Buyers {buyers}')
                 # Finally, increment the transactions counter
                 t += 1
