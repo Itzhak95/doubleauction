@@ -1,14 +1,8 @@
-# This program implements Gjerstad and Dickhaut's (1998) model of the double auction
-# To simplify the code, we assume infinite memory
-# I also endow each seller with one unit; and give each buyer unit demand
+# In this variant, I iterate the main file many times.
 
 import numpy as np
 from scipy.interpolate import CubicSpline
 from random import choices, randint
-import random
-
-np.random.seed(2)
-random.seed(2)
 
 # Set the number of simulations
 
