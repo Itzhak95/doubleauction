@@ -10,13 +10,13 @@ from random import choices, randint
 
 # Set the buyer valuations and seller costs
 
-input_values = [100, 200, 300, 400, 500]
+input_values = [92, 72, 52, 32, 12]
 
-input_costs = [195, 245, 295, 345, 395]
+input_costs = [28, 38, 48, 58, 68]
 
 # Set the value of the 'very high' ask (resp., bid) which will never (resp., always) be accepted
 
-m = 1000
+m = 200
 
 # Set the maximum length l of every round
 
@@ -28,11 +28,11 @@ r = 2
 
 # Set the number of transactions that are remembered
 
-memory = 3
+memory = 5
 
 # Set the replacement rule (0 = no replacement, 1 = perfect replacement, 2 = random replacement)
 
-replacement = 0
+replacement = 1
 
 # HISTORIES
 
@@ -97,16 +97,6 @@ def p_hat(a):
     elif a >= m:
         return 0.0
     else:
-        if tag(a) + bg(a) + ral(a) == 0:
-            print("ERROR P!")
-            print(a)
-            print(tag(a))
-            print(bg(a))
-            print(ral(a))
-            print(union)
-            print(accepted_asks)
-            print(bids)
-            print(rejected_asks)
         return (tag(a) + bg(a)) / (tag(a) + bg(a) + ral(a))
 
 # Now extend these beliefs over the reals, while also taking care of asks outside of the bid/ask spread
@@ -166,16 +156,6 @@ def q_hat(b):
     elif b >= m:
         return 1.0
     else:
-        if tbl(b) + al(b) + rbg(b) == 0:
-            print('ERROR Q!')
-            print(b)
-            print(tbl(b))
-            print(al(b))
-            print(rbg(b))
-            print(union)
-            print(accepted_bids)
-            print(asks)
-            print(rejected_bids)
         return (tbl(b) + al(b))/(tbl(b) + al(b) + rbg(b))
 
 # Extend these beliefs over the reals as before, again taking account of the spread reduction rule
@@ -320,9 +300,9 @@ for element in range(r):
         # First, choose a player
         player = choose_player()
         if player is None:
-            if market_bid != 0:
+            if market_bid != 0 and market_bid not in rejected_bids[t]:
                 rejected_bids[t].append(market_bid)
-            if market_ask != m:
+            if market_ask != m and market_ask not in rejected_asks[t]:
                 rejected_asks[t].append(market_ask)
             print("End of round")
             break
@@ -336,8 +316,9 @@ for element in range(r):
             print(f'Rejected bids: {rejected_bids}')
             index = buyers.index(player)
             valuation = values[index]
-            print(f'Valuation {valuation}')
+            print(f'Valuation: {valuation}')
             bid = optimal_bid(valuation)[0]
+            print(f'Bid: {bid}')
             # They might choose to accept the market ask, leading to transaction
             if bid == market_ask:
                 trades += 1
@@ -470,6 +451,16 @@ for element in range(r):
         union = list(dict.fromkeys(mem(asks) + mem(bids) + [0, m]))
         print(f'union: {union}')
         print('------')
+        # Also...
+        if iteration == l + 1:
+            if market_ask not in rejected_asks[t] and market_ask != m:
+                rejected_asks[t].append(market_ask)
+                print('!')
+                print(rejected_asks)
+            if market_bid not in rejected_bids[t] and market_bid != 0:
+                rejected_bids[t].append(market_bid)
+                print('!')
+                print(rejected_bids)
     # Save the data from this round
     all_prices.append(prices)
     number_of_trades.append(trades)
