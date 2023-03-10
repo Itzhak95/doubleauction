@@ -1,12 +1,18 @@
-# In this variant, I iterate the main file many times.
+# This program implements Gjerstad and Dickhaut's (1998) model of the double auction
+# To simplify the code, we assume infinite memory
+# I also endow each seller with one unit; and give each buyer unit demand
 
 import numpy as np
 from scipy.interpolate import CubicSpline
 from random import choices, randint
+import random
+
+np.random.seed(2)
+random.seed(2)
 
 # Set the number of simulations
 
-s = 20
+s = 10
 
 # Lists to collect the results
 
@@ -21,9 +27,9 @@ for i in range(s):
 
     # Set the buyer valuations and seller costs
 
-    input_values = [100, 80, 60, 40, 20]
+    input_values = [92, 72, 52, 32, 12]
 
-    input_costs = [35, 45, 55, 65, 75]
+    input_costs = [28, 38, 48, 58, 68]
 
     # Set the value of the 'very high' ask (resp., bid) which will never (resp., always) be accepted
 
@@ -31,19 +37,19 @@ for i in range(s):
 
     # Set the maximum length l of every round
 
-    l = 150
+    l = 50
 
     # Set the number of rounds
 
-    r = 10
+    r = 2
 
     # Set the number of transactions that are remembered
 
-    memory = 3
+    memory = 2
 
     # Set the replacement rule (0 = no replacement, 1 = perfect replacement, 2 = random replacement)
 
-    replacement = 0
+    replacement = 1
 
     # HISTORIES
 
@@ -108,16 +114,6 @@ for i in range(s):
         elif a >= m:
             return 0.0
         else:
-            if tag(a) + bg(a) + ral(a) == 0:
-                print("ERROR P!")
-                print(a)
-                print(tag(a))
-                print(bg(a))
-                print(ral(a))
-                print(union)
-                print(accepted_asks)
-                print(bids)
-                print(rejected_asks)
             return (tag(a) + bg(a)) / (tag(a) + bg(a) + ral(a))
 
     # Now extend these beliefs over the reals, while also taking care of asks outside of the bid/ask spread
@@ -306,7 +302,8 @@ for i in range(s):
 
     # Now start the simulation
 
-    for element in range(r):
+    # for element in range(r):
+    for i in range(r):
         # At the start of a round, refresh the buyer/seller valuations
         buyers = list(range(0, n))
         sellers = list(range(n, 2*n))
@@ -325,15 +322,15 @@ for i in range(s):
         trades = 0
         # The round now begins
         iteration = 0
-        for time in range(l):
+        while iteration <= l:
             iteration += 1
             print(f'Move: {iteration}')
             # First, choose a player
             player = choose_player()
             if player is None:
-                if market_bid != 0:
+                if market_bid != 0 and market_bid not in rejected_bids[t]:
                     rejected_bids[t].append(market_bid)
-                if market_ask != m:
+                if market_ask != m and market_ask not in rejected_asks[t]:
                     rejected_asks[t].append(market_ask)
                 print("End of round")
                 break
@@ -481,6 +478,16 @@ for i in range(s):
             union = list(dict.fromkeys(mem(asks) + mem(bids) + [0, m]))
             print(f'union: {union}')
             print('------')
+            # Also...
+            if iteration == l+1:
+                if market_ask not in rejected_asks[t] and market_ask != m:
+                    rejected_asks[t].append(market_ask)
+                    print('!')
+                    print(rejected_asks)
+                if market_bid not in rejected_bids[t] and market_bid != 0:
+                    rejected_bids[t].append(market_bid)
+                    print('!')
+                    print(rejected_bids)
         # Save the data from this round
         all_prices.append(prices)
         number_of_trades.append(trades)
@@ -499,7 +506,44 @@ for i in range(s):
     big_values.append(all_buyer_values)
     big_costs.append(all_seller_costs)
 
+# Calculate mean absolute deviation
+print('----------------')
+
+higher = 52
+lower = 48
+
+def ad(number):
+    if number >= higher:
+        return abs(number - higher)
+    elif number < lower:
+        return abs(number-lower)
+    else:
+        return 0
+
+num_prices = 0
+tad = 0
+for simulation in big_prices:
+    for round in simulation:
+        for price in round:
+            num_prices += 1
+            tad += ad(price)
+
+print('MAD')
+print(tad/num_prices)
+
+num_prices = 0
+tad = 0
+for simulation in big_prices:
+    for round in simulation[1:]:
+        for price in round:
+            num_prices += 1
+            tad += ad(price)
+
+print('MAD (round >= 2)')
+print(tad/num_prices)
+
 # Finally, print the results
+print('----------------')
 print(big_prices)
 print(big_trades)
 print(big_values)
